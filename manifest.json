@@ -1,0 +1,11 @@
+{
+  "name": "Content Cropper",
+  "description": "An HTML element cropping tool",
+  "version": "1.0",
+  "manifest_version": 2,
+  "permissions": ["activeTab", "tabs", "<all_urls>"],
+  "browser_action": {
+    "default_title": "Content Cropper",
+    "default_popup": "popup/popup.html"
+  }
+}
