@@ -14,6 +14,7 @@ img {
   padding: 0.5rem;
   border-radius: 0.25rem;
 }
-img:hover {
+img:hover,
+.selected-mode {
   background-color: #eeeeee;
 }
