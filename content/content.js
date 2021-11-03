@@ -1,6 +1,6 @@
 (function() {
   const borderTolerance = 15;
-  let borderSide = "";
+  let resizeDirection = "";
   let mouseX = 0;
   let mouseY = 0;
   let dragging = false;
@@ -10,7 +10,7 @@
   // Highlight hovered elements
   function highlight(e) {
     if(selecting) {
-      e.target.style.outline = "3px dashed #6c44d7";
+      e.target.classList.add("edit-selecting");
     }
   }
   document.body.addEventListener("mouseover", highlight);
@@ -18,7 +18,7 @@
   // Stop highlighting elements when user stops hovering
   function removeHighlight(e) {
     if(selecting) {
-      e.target.style.outline = "";
+      e.target.classList.remove("edit-selecting");
     }
   }
   document.body.addEventListener("mouseout", removeHighlight);
@@ -29,16 +29,16 @@
     e.preventDefault();
     e.stopImmediatePropagation();
     // Stop if click event comes from resizing an element
-    if(dragging) {
+    if(dragging || e.target.className.includes("edit-meta")) {
       dragging = false;
       return;
     }
     // Unstyle the previous element (used when clicking another element)
     if(selected) {
-      selected.style.outline = "none";
-      selected.style.cursor = "auto";
+      document.querySelectorAll(".edit-corner").forEach(corner => corner.remove());
+      selected.classList.remove("edit-selected");
       selected.removeAttribute("draggable");
-      document.body.removeEventListener("mousemove", showArrows);
+      // document.body.removeEventListener("mousemove", showArrows);
       endResize();
     }
     // Continue de-selecting element if clicking the same element
@@ -49,51 +49,52 @@
     } else {
       selecting = false;
       selected = e.target;
-      selected.style.outline = "4px solid #6c44d7";
+      // Positioning is separate because it shouldn't be cleaned up
+      selected.style.position = "relative";
+      selected.classList.remove("edit-selecting");
+      selected.classList.add("edit-selected");
       selected.setAttribute("draggable", false);
-      document.body.addEventListener("mousemove", showArrows);
+      // document.body.addEventListener("mousemove", showArrows);
+
+      createCorners();
     }
   }
   // Setting capture flag to true triggers event listeners from top to
   // bottom in DOM tree (making this trigger before other click listeners)
   document.body.addEventListener("click", selectElement, true);
 
-  // Change the cursor into an appropriate arrow
-  function showArrows(e) {
-    if(!dragging) {
-      // Get side the cursor is currently hovering over
-      borderSide = "";
-      if(e.offsetY < borderTolerance) {
-        borderSide += "n";
-      } else if(e.offsetY > e.target.offsetHeight - borderTolerance) {
-        borderSide += "s";
-      }
-      if(e.offsetX < borderTolerance) {
-        borderSide += "w";
-      } else if(e.offsetX > e.target.offsetWidth - borderTolerance) {
-        borderSide += "e";
-      }
+  function createCorners() {
+    // These 'directions' will be used to access properties in DOMRect
+    let directions = ["top-left", "top-right", "bottom-left", "bottom-right"];
+    for(let direction of directions) {
+      let corner = document.createElement("div");
+      corner.classList.add(direction, "edit-corner", "edit-meta");
+      corner.addEventListener("mousedown", startResize);
+      corner.addEventListener("mouseup", endResize);
+      document.body.appendChild(corner);
+    }
+    positionCorners();
+  }
 
-      // Hovering over content
-      if(borderSide === "") {
-        selected.style.cursor = "auto";
-        // Allow the user to continue dragging, but not start dragging
-        selected.removeEventListener("mousedown", startResize);
-        selected.removeEventListener("mouseup", endResize);
-      // Hovering over a border
-      } else {
-        selected.style.cursor = borderSide + "-resize";
-        selected.addEventListener("mousedown", startResize);
-        selected.addEventListener("mouseup", endResize);
-      }
+  function positionCorners() {
+    let rect = selected.getBoundingClientRect();
+    let corners = document.querySelectorAll(".edit-corner");
+    for(let corner of corners) {
+      // Index is 0 because the direction was added first in createCorners()
+      let direction = corner.classList[0];
+      let vertical = direction.substring(0, direction.indexOf("-"));
+      let horizontal = direction.substring(direction.indexOf("-") + 1);
+      corner.style.top = (rect[vertical] + window.scrollY - corner.offsetHeight / 2) + "px";
+      corner.style.left = (rect[horizontal] + window.scrollX - corner.offsetWidth / 2) + "px";
     }
   }
 
-  // Initialize dragging logic
+  // Initialize resize variables
   function startResize(e) {
-    dragging = true;
+    resizeDirection = e.target.classList[0];
     mouseX = e.x;
     mouseY = e.y;
+    dragging = true;
     document.body.addEventListener("mousemove", resize);
   }
 
@@ -108,13 +109,17 @@
 
   // Resize the selected element
   function resize(e) {
-    selected.style.position = "relative";
+    // Make sure the user is holding down left-click (value of 1)
+    if(e.buttons !== 1) {
+      return;
+    }
+    
     // Vertical sides
-    if(borderSide.includes("n") || borderSide.includes("s")) {
+    if(resizeDirection.includes("top") || resizeDirection.includes("bottom")) {
       let changeY = e.y - mouseY;
       let newHeight;
       // Top: add to top, subtract from height
-      if(borderSide.includes("n")) {
+      if(resizeDirection.includes("top")) {
         selected.style.top = (parseInt(getComputedStyle(selected).top) + changeY) + "px";
         newHeight = (parseInt(getComputedStyle(selected).height) - changeY) + "px";
       // Bottom: add to height
@@ -129,11 +134,11 @@
     }
 
     // Horizontal sides
-    if(borderSide.includes("w") || borderSide.includes("e")) {
+    if(resizeDirection.includes("left") || resizeDirection.includes("right")) {
       let changeX = e.x - mouseX;
       let newWidth;
       // Left: add to left, subtract from width
-      if(borderSide.includes("w")) {
+      if(resizeDirection.includes("left")) {
         selected.style.left = (parseInt(getComputedStyle(selected).left) + changeX) + "px";
         newWidth = (parseInt(getComputedStyle(selected).width) - changeX) + "px";
       // Right: add to width
@@ -146,13 +151,15 @@
       selected.style.maxWidth = newWidth;
       mouseX = e.x;
     }
+
+    positionCorners();
   }
 
   // Clean up event listeners when requested by popup
   browser.runtime.onMessage.addListener(message => {
     if(message === "cleanup") {
       if(selected) {
-        selected.style.outline = "none";
+        selected.classList.remove("edit-selecting", "edit-selected");
       }
       document.body.removeEventListener("mouseover", highlight);
       document.body.removeEventListener("mouseout", removeHighlight);

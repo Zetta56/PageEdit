@@ -11,13 +11,15 @@ resizeButton.addEventListener("click", () => {
     if(data.selectedMode !== "resize") {
       resizeButton.classList.add("selected-mode");
       browser.storage.local.set({selectedMode: "resize"});
-      browser.tabs.executeScript({file: "../content/resize.js"})
+      browser.tabs.executeScript({file: "../content/content.js"});
+      browser.tabs.insertCSS({file: "../content/content.css"})
     } else {
       resizeButton.classList.remove("selected-mode");
       browser.storage.local.set({selectedMode: ""});
       browser.tabs.query({active: true, currentWindow: true}, tabs => {
         browser.tabs.sendMessage(tabs[0].id, "cleanup");
-      })
+        browser.tabs.removeCSS(tabs[0].id, {file: "../content/content.css"});
+      });
     }
   })
 });
