@@ -4,6 +4,7 @@
 .edit-selected {
   outline: 3px solid #6c44d7;
   overflow: hidden;
+  cursor: move;
   z-index: 999;
 }
 .edit-corner {

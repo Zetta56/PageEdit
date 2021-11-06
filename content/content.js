@@ -1,5 +1,4 @@
 (function() {
-  const borderTolerance = 15;
   let resizeDirection = "";
   let mouseX = 0;
   let mouseY = 0;
@@ -38,8 +37,7 @@
       document.querySelectorAll(".edit-corner").forEach(corner => corner.remove());
       selected.classList.remove("edit-selected");
       selected.removeAttribute("draggable");
-      // document.body.removeEventListener("mousemove", showArrows);
-      endResize();
+      endDrag();
     }
     // Continue de-selecting element if clicking the same element
     if(e.target === selected) {
@@ -54,9 +52,11 @@
       selected.classList.remove("edit-selecting");
       selected.classList.add("edit-selected");
       selected.setAttribute("draggable", false);
-      // document.body.addEventListener("mousemove", showArrows);
 
+      // Add corners and mouse listeners
       createCorners();
+      selected.addEventListener("mousedown", startMove);
+      document.body.addEventListener("mouseup", endDrag);
     }
   }
   // Setting capture flag to true triggers event listeners from top to
@@ -70,7 +70,7 @@
       let corner = document.createElement("div");
       corner.classList.add(direction, "edit-corner", "edit-meta");
       corner.addEventListener("mousedown", startResize);
-      corner.addEventListener("mouseup", endResize);
+      document.body.addEventListener("mouseup", endDrag);
       document.body.appendChild(corner);
     }
     positionCorners();
@@ -98,22 +98,12 @@
     document.body.addEventListener("mousemove", resize);
   }
 
-  // Remove drag listeners
-  function endResize(e) {
-    if(selected) {
-      document.body.removeEventListener("mousemove", resize);
-      selected.removeEventListener("mousedown", startResize);
-      selected.removeEventListener("mouseup", endResize);
-    }
-  }
-
   // Resize the selected element
   function resize(e) {
     // Make sure the user is holding down left-click (value of 1)
     if(e.buttons !== 1) {
       return;
     }
-    
     // Vertical sides
     if(resizeDirection.includes("top") || resizeDirection.includes("bottom")) {
       let changeY = e.y - mouseY;
@@ -153,6 +143,35 @@
     }
 
     positionCorners();
+  }
+
+  // Initialize move variables
+  function startMove(e) {
+    mouseX = e.x;
+    mouseY = e.y;
+    dragging = true;
+    document.body.addEventListener("mousemove", move);
+  }
+
+  function move(e) {
+    let changeX = e.x - mouseX;
+    let changeY = e.y - mouseY;
+    mouseX = e.x;
+    mouseY = e.y;
+    selected.style.left = (parseInt(getComputedStyle(selected).left) + changeX) + "px";
+    selected.style.top = (parseInt(getComputedStyle(selected).top) + changeY) + "px";
+    positionCorners();
+  }
+
+  // Remove drag listeners
+  function endDrag(e) {
+    if(selected) {
+      selected.removeEventListener("mousedown", startResize);
+      document.body.removeEventListener("mousemove", resize);
+      selected.removeEventListener("mousedown", startMove);
+      document.body.removeEventListener("mousemove", move);
+      document.body.removeEventListener("mouseup", endDrag);
+    }
   }
 
   // Clean up event listeners when requested by popup
