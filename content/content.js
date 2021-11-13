@@ -36,8 +36,7 @@
     if(selected) {
       document.querySelectorAll(".edit-corner").forEach(corner => corner.remove());
       selected.classList.remove("edit-selected");
-      selected.removeAttribute("draggable");
-      endDrag();
+      deselectListeners();
     }
     // Continue de-selecting element if clicking the same element
     if(e.target === selected) {
@@ -51,17 +50,21 @@
       selected.style.position = "relative";
       selected.classList.remove("edit-selecting");
       selected.classList.add("edit-selected");
-      selected.setAttribute("draggable", false);
 
       // Add corners and mouse listeners
       createCorners();
       selected.addEventListener("mousedown", startMove);
-      document.body.addEventListener("mouseup", endDrag);
+      selected.addEventListener("dragstart", preventDefaultDrag);
+      document.body.addEventListener("mouseup", deselectListeners);
     }
   }
   // Setting capture flag to true triggers event listeners from top to
   // bottom in DOM tree (making this trigger before other click listeners)
   document.body.addEventListener("click", selectElement, true);
+
+  function preventDefaultDrag(e) {
+    e.preventDefault();
+  }
 
   function createCorners() {
     // These 'directions' will be used to access properties in DOMRect
@@ -70,7 +73,7 @@
       let corner = document.createElement("div");
       corner.classList.add(direction, "edit-corner", "edit-meta");
       corner.addEventListener("mousedown", startResize);
-      document.body.addEventListener("mouseup", endDrag);
+      document.body.addEventListener("mouseup", deselectListeners);
       document.body.appendChild(corner);
     }
     positionCorners();
@@ -147,6 +150,7 @@
 
   // Initialize move variables
   function startMove(e) {
+    console.log("a")
     mouseX = e.x;
     mouseY = e.y;
     dragging = true;
@@ -164,18 +168,19 @@
   }
 
   // Remove drag listeners
-  function endDrag(e) {
+  function deselectListeners(e) {
     if(selected) {
       selected.removeEventListener("mousedown", startResize);
       document.body.removeEventListener("mousemove", resize);
       selected.removeEventListener("mousedown", startMove);
       document.body.removeEventListener("mousemove", move);
-      document.body.removeEventListener("mouseup", endDrag);
+      selected.removeEventListener("dragstart", preventDefaultDrag);
+      document.body.removeEventListener("mouseup", deselectListeners);
     }
   }
 
   // Clean up event listeners when requested by popup
-  browser.runtime.onMessage.addListener(message => {
+  function cleanup(message) {
     if(message === "cleanup") {
       if(selected) {
         selected.classList.remove("edit-selecting", "edit-selected");
@@ -183,6 +188,8 @@
       document.body.removeEventListener("mouseover", highlight);
       document.body.removeEventListener("mouseout", removeHighlight);
       document.body.removeEventListener("click", selectElement, true);
+      browser.runtime.onMessage.removeEventListener(cleanup);
     }
-  })
+  }
+  browser.runtime.onMessage.addListener(cleanup)
 })()
