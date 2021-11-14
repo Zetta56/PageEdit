@@ -1,3 +1,6 @@
+.edit-meta.hidden {
+  display: none;
+}
 .edit-context-container {
   font-family: Helvetica;
   position: fixed;
@@ -5,13 +8,18 @@
   box-shadow: 0px 0px 10px #c3b4ea;
   z-index: 1000;
 }
-.edit-meta.hidden {
-  display: none;
-}
 .edit-context-item {
   font-size: 12pt;
   padding: 0.75rem 1rem;
   cursor: pointer;
+}
+.edit-context-item.disabled {
+  color: #777777;
+  pointer-events: none;
+  cursor: auto;
+}
+.edit-context-item:hover {
+  background-color: #eeeeee;
 }
 .edit-selecting {
   outline: 3px dashed #6c44d7;

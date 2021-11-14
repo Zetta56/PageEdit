@@ -3,28 +3,36 @@
   let mouseX = 0;
   let mouseY = 0;
   let dragging = false;
-  let selecting = true;
   let selected = null;
   createMetaElements();
 
   // Initialize context menu and resize corners
   function createMetaElements() {
-    let container = document.createElement("div");
-    container.classList.add("edit-context-container", "edit-meta");
+    // Context Menu Container
+    const container = document.createElement("div");
+    container.classList.add("edit-context-container", "edit-meta", "hidden");
     document.body.appendChild(container);
 
-    let deleteItem = document.createElement("div");
-    deleteItem.classList.add("edit-context-item", "edit-meta");
-    deleteItem.innerHTML = "Delete";
-    deleteItem.addEventListener("click", deleteSelected);
-    container.appendChild(deleteItem);
+    // Context Menu Items
+    const items = [
+      {name: "delete", label: "Delete", action: deleteSelected},
+      {name: "undo", label: "Undo", action: undo},
+      {name: "redo", label: "Redo", action: redo}
+    ]
+    for(let item of items) {
+      let itemDiv = document.createElement("div");
+      itemDiv.classList.add("edit-context-item", "edit-meta", item.name);
+      itemDiv.innerHTML = item.label;
+      itemDiv.addEventListener("click", item.action);
+      container.appendChild(itemDiv);
+    }
 
-    let directions = ["top-left", "top-right", "bottom-left", "bottom-right"];
+    // Resize Corners
+    const directions = ["top-left", "top-right", "bottom-left", "bottom-right"];
     for(let direction of directions) {
       let corner = document.createElement("div");
       corner.classList.add(direction, "edit-corner", "edit-meta", "hidden");
       corner.addEventListener("mousedown", startResize);
-      document.body.addEventListener("mouseup", deselectListeners);
       document.body.appendChild(corner);
     }
   }
@@ -36,7 +44,7 @@
 
   // Highlight hovered elements
   function highlight(e) {
-    if(selecting) {
+    if(!selected && !e.target.className.includes("edit-meta")) {
       e.target.classList.add("edit-selecting");
     }
   }
@@ -44,52 +52,65 @@
 
   // Stop highlighting when user stops hovering over element
   function removeHighlight(e) {
-    if(selecting) {
+    if(!selected && !e.target.className.includes("edit-meta")) {
       e.target.classList.remove("edit-selecting");
     }
   }
   document.body.addEventListener("mouseout", removeHighlight);
 
+  // Show custom context menu at mouse location
+  function showContextMenu(e) {
+    e.preventDefault();
+    const container = document.querySelector(".edit-context-container");
+    container.classList.remove("hidden");
+    container.style.left = e.x + "px";
+    container.style.top = e.y + "px";
+
+    // Disable (or enable) context items
+    const deleteItem = container.querySelector(".delete");
+    if(!selected) {
+      deleteItem.classList.add("disabled");
+    } else {
+      deleteItem.classList.remove("disabled");
+    }
+  }
+  document.body.addEventListener("contextmenu", showContextMenu);
+
   // Select (or de-select) an element on click
   function selectElement(e) {
-    // Ignore context menu
-    if(e.target.className.includes("edit-context-menu") || e.target.className.includes("edit-context-item")) {
+    // Super Exclusions with default behaviors that shouldn't be ignored
+    if(e.target.className.includes("edit-context")) {
       return;
     }
     // Stop the clicked element's normal click behavior
     e.preventDefault();
     e.stopImmediatePropagation();
-    // Unstyle the previous element (used when clicking another element)
-    if(selected) {
-      document.querySelector(".edit-context-container").classList.add("hidden");
-      document.querySelectorAll(".edit-corner").forEach(corner => corner.classList.add("hidden"));
-      selected.classList.remove("edit-selected");
-      deselectListeners();
+    // Exclusions that shouldn't be selected
+    if(dragging || e.target.className.includes("edit-meta") || e.target.tagName === "BODY") {
+      document.body.removeEventListener("mousemove", resize);
+      document.body.removeEventListener("mousemove", move);
+      dragging = false;
+      return;
     }
-    // Select the element if it's different or right after dragging
-    if(e.target !== selected || dragging) {
-      // Don't change targets if click comes from drag
-      if(dragging) {
-        dragging = false;
-      } else {
-        selected = e.target;
+    // Select the element if it's different
+    if(e.target !== selected) {
+      // If already selecting an element, deselect it
+      if(selected) {
+        deselect();
       }
-      selecting = false;
-      // Positioning is separate because it shouldn't be cleaned up
-      selected.style.position = "relative";
+      selected = e.target;
       selected.classList.remove("edit-selecting");
       selected.classList.add("edit-selected");
+      // Positioning is separate because it shouldn't be cleaned up
+      selected.style.position = "relative";
 
       // Add corners and mouse listeners
       positionCorners();
       selected.addEventListener("mousedown", startMove);
-      selected.addEventListener("contextmenu", showContextMenu);
       selected.addEventListener("dragstart", preventDefaultDrag);
-      document.body.addEventListener("mouseup", deselectListeners);
     // Continue de-selecting element if clicking the same element
     } else {
-      selecting = true;
-      selected = null;
+      deselect();
     }
   }
   // Setting capture flag to true triggers event listeners from top to
@@ -101,25 +122,28 @@
   }
 
   function deleteSelected(e) {
+    console.log("delete")
     if(selected) {
       selected.remove();
       document.querySelector(".edit-context-container").classList.add("hidden");
       document.querySelectorAll(".edit-corner").forEach(corner => corner.classList.add("hidden"));
+      selected = null;
     }
   }
 
-  // Show context menu at mouse pointer
-  function showContextMenu(e) {
-    e.preventDefault();
-    let container = document.querySelector(".edit-context-container");
-    container.classList.remove("hidden");
-    container.style.left = e.x + "px";
-    container.style.top = e.y + "px";
+  function undo(e) {
+    console.log("undo");
+    document.querySelector(".edit-context-container").classList.add("hidden");
+  }
+
+  function redo(e) {
+    console.log("redo");
+    document.querySelector(".edit-context-container").classList.add("hidden");
   }
 
   function positionCorners() {
-    let rect = selected.getBoundingClientRect();
-    let corners = document.querySelectorAll(".edit-corner");
+    const rect = selected.getBoundingClientRect();
+    const corners = document.querySelectorAll(".edit-corner");
     for(let corner of corners) {
       // Index is 0 because the direction was added first in createCorners()
       let direction = corner.classList[0];
@@ -156,7 +180,7 @@
         newHeight = getChangedValue("height", -changeY);
         selected.style.top = getChangedValue("top", changeY);
         selected.style.marginBottom = getChangedValue("marginBottom", changeY);
-        // Bottom: add to height
+      // Bottom: add to height
       } else {
         newHeight = getChangedValue("height", changeY);
       }
@@ -188,15 +212,19 @@
     positionCorners();
   }
 
-  // Initialize move variables
+  // Initialize move variables on left click (value of 1)
   function startMove(e) {
-    mouseX = e.x;
-    mouseY = e.y;
-    dragging = true;
-    document.body.addEventListener("mousemove", move);
+    if(e.button === 0) {
+      mouseX = e.x;
+      mouseY = e.y;
+      document.body.addEventListener("mousemove", move);
+    }
   }
 
   function move(e) {
+    if(!dragging) {
+      dragging = true;
+    }
     let changeX = e.x - mouseX;
     let changeY = e.y - mouseY;
     mouseX = e.x;
@@ -207,14 +235,19 @@
   }
 
   // Remove drag listeners
-  function deselectListeners(e) {
+  function deselect(e) {
     if(selected) {
-      selected.removeEventListener("mousedown", startResize);
       document.body.removeEventListener("mousemove", resize);
-      selected.removeEventListener("mousedown", startMove);
       document.body.removeEventListener("mousemove", move);
+      selected.removeEventListener("mousedown", startResize);
+      selected.removeEventListener("mousedown", startMove);
       selected.removeEventListener("dragstart", preventDefaultDrag);
-      document.body.removeEventListener("mouseup", deselectListeners);
+      document.body.removeEventListener("mouseup", deselect);
+
+      document.querySelector(".edit-context-container").classList.add("hidden");
+      document.querySelectorAll(".edit-corner").forEach(corner => corner.classList.add("hidden"));
+      selected.classList.remove("edit-selected");
+      selected = null;
     }
   }
 
@@ -222,15 +255,14 @@
   function cleanup(message) {
     if(message === "cleanup") {
       if(selected) {
-        deselectListeners();
+        deselect();
         selected.classList.remove("edit-selecting", "edit-selected");
-        selected = null;
-        selecting = true;
       }
       document.querySelectorAll(".edit-meta").forEach(el => el.remove());
       document.body.removeEventListener("mouseover", highlight);
       document.body.removeEventListener("mouseout", removeHighlight);
       document.body.removeEventListener("click", selectElement, true);
+      document.body.removeEventListener("contextmenu", showContextMenu);
       browser.runtime.onMessage.removeListener(cleanup);
     }
   }
