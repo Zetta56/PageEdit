@@ -1,13 +1,16 @@
 // Get popup buttons
 let resizeButton = document.querySelector("#resize");
-browser.storage.local.get("selectedMode").then(data => {
-  if(data.selectedMode === "resize") {
-    resize.classList.add("selected-mode");
+
+// Highlight already selected buttons on popup
+browser.storage.local.get("editing").then(data => {
+  if(data.editing) {
+    resizeButton.classList.add("active");
   }
 });
+
 // Execute content script when clicking on a mode
 resizeButton.addEventListener("click", () => {
-  browser.storage.local.get("selectedMode").then(data => {
+  browser.storage.local.get("editing").then(data => {
     if(!data.editing) {
       resizeButton.classList.add("active");
       browser.tabs.executeScript({file: "../content/content.js"});
@@ -19,6 +22,6 @@ resizeButton.addEventListener("click", () => {
         browser.tabs.removeCSS(tabs[0].id, {file: "../content/content.css"});
       });
     }
-    browser.storage.local.set({editing: data.editing});
+    browser.storage.local.set({editing: !data.editing});
   })
 });
