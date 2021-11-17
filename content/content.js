@@ -2,8 +2,10 @@
   let resizeDirection = "";
   let mouseX = 0;
   let mouseY = 0;
-  let dragging = false;
+  let resizing = false;
+  let moving = false;
   let selected = null;
+  let history = [];
   createMetaElements();
 
   // Initialize context menu and resize corners
@@ -65,13 +67,20 @@
     container.classList.remove("hidden");
     container.style.left = e.x + "px";
     container.style.top = e.y + "px";
+    for(let i = 0; i < container.children.length; i++) {
+      container.children[i].classList.remove("disabled");
+    }
 
     // Disable (or enable) context items
-    const deleteItem = container.querySelector(".delete");
+    const committed = history.filter(change => !change.undid);
+    if(committed.length <= 1) {
+      container.querySelector(".undo").classList.add("disabled");
+    }
+    if(history.length <= 1) {
+      container.querySelector(".redo").classList.add("disabled");
+    }
     if(!selected) {
-      deleteItem.classList.add("disabled");
-    } else {
-      deleteItem.classList.remove("disabled");
+      container.querySelector(".delete").classList.add("disabled");
     }
   }
   document.body.addEventListener("contextmenu", showContextMenu);
@@ -85,11 +94,24 @@
     // Stop the clicked element's normal click behavior
     e.preventDefault();
     e.stopImmediatePropagation();
+    const context = document.querySelector(".edit-context-container");
+    if(!context.classList.contains("hidden")) {
+      context.classList.add("hidden");
+    }
     // Exclusions that shouldn't be selected
-    if(dragging || e.target.className.includes("edit-meta") || e.target.tagName === "BODY") {
+    if(resizing) {
       document.body.removeEventListener("mousemove", resize);
+      resizing = false;
+      saveChanges("resize");
+      return;
+    }
+    if(moving) {
       document.body.removeEventListener("mousemove", move);
-      dragging = false;
+      moving = false;
+      saveChanges("move");
+      return;
+    }
+    if(e.target.className.includes("edit-meta") || e.target.tagName === "BODY") {
       return;
     }
     // Select the element if it's different
@@ -101,10 +123,10 @@
       selected = e.target;
       selected.classList.remove("edit-selecting");
       selected.classList.add("edit-selected");
-      // Positioning is separate because it shouldn't be cleaned up
-      selected.style.position = "relative";
+      selected.style.position = "relative"; // This shouldn't be cleaned up, unlike classes
 
       // Add corners and mouse listeners
+      saveChanges("select");
       positionCorners();
       selected.addEventListener("mousedown", startMove);
       selected.addEventListener("dragstart", preventDefaultDrag);
@@ -122,8 +144,8 @@
   }
 
   function deleteSelected(e) {
-    console.log("delete")
     if(selected) {
+      saveChanges("delete", { parent: selected.parentNode, sibling: selected.nextSibling });
       selected.remove();
       document.querySelector(".edit-context-container").classList.add("hidden");
       document.querySelectorAll(".edit-corner").forEach(corner => corner.classList.add("hidden"));
@@ -132,13 +154,90 @@
   }
 
   function undo(e) {
-    console.log("undo");
+    const committed = history.filter(change => !change.undid);
+    if(committed.length >= 2) {
+      const currentChange = committed[committed.length - 1];
+      switch(currentChange.type) {
+        case "resize":
+        case "move":
+          const previousRect = committed[committed.length - 2].rect;
+          const parentRect = currentChange.element.parentNode.getBoundingClientRect();
+          currentChange.element.style.top = (previousRect.top - parentRect.top) + "px";
+          currentChange.element.style.left = (previousRect.left - parentRect.left) + "px";
+          currentChange.element.style.width = previousRect.width + "px";
+          currentChange.element.style.minWidth = previousRect.width + "px";
+          currentChange.element.style.maxWidth = previousRect.width + "px";
+          currentChange.element.style.height = previousRect.height + "px";
+          currentChange.element.style.minHeight = previousRect.height + "px";
+          currentChange.element.style.maxHeight = previousRect.height + "px";
+          positionCorners();
+          break;
+        case "delete":
+          // Try to re-insert the deleted element in the correct order
+          if(currentChange.sibling) {
+            currentChange.parent.insertBefore(currentChange.element, currentChange.sibling);
+          } else {
+            currentChange.parent.appendChild(currentChange.element);
+          }
+          selected = currentChange.element;
+          selected.addEventListener("mousedown", startMove);
+          selected.addEventListener("dragstart", preventDefaultDrag);
+          positionCorners();
+          break;
+      }
+      currentChange.undid = true;
+    }
     document.querySelector(".edit-context-container").classList.add("hidden");
   }
 
   function redo(e) {
-    console.log("redo");
+    const latestUndone = history.findIndex(change => change.undid);
+    if(latestUndone >= 0) {
+      const nextChange = history[latestUndone];
+      switch(nextChange.type) {
+        case "resize":
+        case "move":
+          const nextRect = nextChange.rect;
+          const parentRect = nextChange.element.parentNode.getBoundingClientRect();
+          nextChange.element.style.top = (nextRect.top - parentRect.top) + "px";
+          nextChange.element.style.left = (nextRect.left - parentRect.left) + "px";
+          nextChange.element.style.width = nextRect.width + "px";
+          nextChange.element.style.minWidth = nextRect.width + "px";
+          nextChange.element.style.maxWidth = nextRect.width + "px";
+          nextChange.element.style.height = nextRect.height + "px";
+          nextChange.element.style.minHeight = nextRect.height + "px";
+          nextChange.element.style.maxHeight = nextRect.height + "px";
+          positionCorners();
+          break;
+        case "delete":
+          nextChange.element.remove();
+          document.querySelectorAll(".edit-corner").forEach(corner => corner.classList.add("hidden"));
+          selected = null;
+          break;
+      }
+      nextChange.undid = false;
+    }
     document.querySelector(".edit-context-container").classList.add("hidden");
+  }
+
+  function saveChanges(type, options) {
+    if(selected) {
+      // Delete all undone chnages
+      const latestUndone = history.findIndex(change => change.undid);
+      if(latestUndone >= 0) {
+        history.splice(latestUndone);
+      }
+      // Delete consecutive selections from history
+      if(history.length > 0 && history[history.length - 1].type === "select" && type === "select") {
+        history.pop();
+      }
+      // Cap history length;
+      if(history.length >= 10) {
+        history.shift();
+      }
+      history.push({ type: type, element: selected, rect: selected.getBoundingClientRect(),
+        undid: false, ...options });
+    }
   }
 
   function positionCorners() {
@@ -160,7 +259,7 @@
     resizeDirection = e.target.classList[0];
     mouseX = e.x;
     mouseY = e.y;
-    dragging = true;
+    resizing = true;
     document.body.addEventListener("mousemove", resize);
   }
 
@@ -179,7 +278,7 @@
       if(resizeDirection.includes("top")) {
         newHeight = getChangedValue("height", -changeY);
         selected.style.top = getChangedValue("top", changeY);
-        selected.style.marginBottom = getChangedValue("marginBottom", changeY);
+        selected.style.marginBottom = -newHeight;
       // Bottom: add to height
       } else {
         newHeight = getChangedValue("height", changeY);
@@ -222,8 +321,8 @@
   }
 
   function move(e) {
-    if(!dragging) {
-      dragging = true;
+    if(!moving) {
+      moving = true;
     }
     let changeX = e.x - mouseX;
     let changeY = e.y - mouseY;
