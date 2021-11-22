@@ -6,10 +6,10 @@
   let moving = false;
   let selected = null;
   let history = [];
-  createMetaElements();
+  initializeContext();
+  initializeCorners();
 
-  // Initialize context menu and resize corners
-  function createMetaElements() {
+  function initializeContext() {
     // Context Menu Container
     const container = document.createElement("div");
     container.classList.add("edit-context-container", "edit-meta", "hidden");
@@ -28,8 +28,9 @@
       itemDiv.addEventListener("click", item.action);
       container.appendChild(itemDiv);
     }
+  }
 
-    // Resize Corners
+  function initializeCorners() {
     const directions = ["top-left", "top-right", "bottom-left", "bottom-right"];
     for(let direction of directions) {
       let corner = document.createElement("div");
@@ -351,19 +352,26 @@
   }
 
   // Clean up event listeners when requested by popup
-  function cleanup(message) {
-    if(message === "cleanup") {
-      if(selected) {
-        deselect();
-        selected.classList.remove("edit-selecting", "edit-selected");
-      }
-      document.querySelectorAll(".edit-meta").forEach(el => el.remove());
-      document.body.removeEventListener("mouseover", highlight);
-      document.body.removeEventListener("mouseout", removeHighlight);
-      document.body.removeEventListener("click", selectElement, true);
-      document.body.removeEventListener("contextmenu", showContextMenu);
-      browser.runtime.onMessage.removeListener(cleanup);
+  function cleanup() {
+    if(selected) {
+      selected.classList.remove("edit-selecting", "edit-selected");
+      deselect();
     }
+    document.querySelectorAll(".edit-meta").forEach(el => el.remove());
+    document.body.removeEventListener("mouseover", highlight);
+    document.body.removeEventListener("mouseout", removeHighlight);
+    document.body.removeEventListener("click", selectElement, true);
+    document.body.removeEventListener("contextmenu", showContextMenu);
+    browser.runtime.onMessage.removeListener(cleanup);
   }
-  browser.runtime.onMessage.addListener(cleanup)
+
+  browser.runtime.onMessage.addListener(message => {
+    if(message === "cleanup") {
+      cleanup();
+    }
+  })
+
+  window.onbeforeunload = e => {
+    browser.runtime.sendMessage("unload");
+  }
 })()

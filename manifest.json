@@ -8,7 +8,7 @@
     "scripts": ["background.js"]
   },
   "browser_action": {
-    "default_title": "Content Cropper",
+    "default_title": "Page Edit",
     "default_popup": "popup/popup.html"
   }
 }
