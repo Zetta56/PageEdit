@@ -3,7 +3,7 @@
   "description": "An visual editor for HTML elements",
   "version": "1.0",
   "manifest_version": 2,
-  "permissions": ["activeTab", "tabs", "<all_urls>", "storage"],
+  "permissions": ["activeTab", "tabs", "storage"],
   "background": {
     "scripts": ["background.js"]
   },

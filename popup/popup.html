@@ -4,10 +4,14 @@
     <link rel="stylesheet" href="popup.css" />
   </head>
   <body>
-    <div class="modes">Modes</div>
-    <hr />
-    <img src="/images/edit.png" title="Enter page editor" id="edit" />
-    <!-- popup.js is down here because it finds DOM elements when loaded -->
-    <script src="popup.js"></script>
+    <div>
+      <img src="/images/edit-inactive.png" title="Enter page editor" id="edit-btn" />
+    </div>
+    <div class="title">Saves</div>
+    <div class="new-save-btn">+ Create New Save</div>
+    <div id="saves"></div>
+    <!-- Scripts are down here because they find DOM elements when loaded -->
+    <script src="/popup/populate.js"></script>
+    <script src="/popup/popup.js"></script>
   </body>
 </html>

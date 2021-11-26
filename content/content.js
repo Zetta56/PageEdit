@@ -6,10 +6,16 @@
   let moving = false;
   let selected = null;
   let history = [];
-  initializeContext();
+  initializeContextMenu();
   initializeCorners();
+  document.body.addEventListener("mouseover", highlight);
+  document.body.addEventListener("mouseout", removeHighlight);
+  document.body.addEventListener("contextmenu", showContextMenu);
+  // Setting capture flag to true triggers event listeners from top to
+  // bottom in DOM tree (making this trigger before other click listeners)
+  document.body.addEventListener("click", selectElement, true);
 
-  function initializeContext() {
+  function initializeContextMenu() {
     // Context Menu Container
     const container = document.createElement("div");
     container.classList.add("edit-context-container", "edit-meta", "hidden");
@@ -51,7 +57,6 @@
       e.target.classList.add("edit-selecting");
     }
   }
-  document.body.addEventListener("mouseover", highlight);
 
   // Stop highlighting when user stops hovering over element
   function removeHighlight(e) {
@@ -59,7 +64,6 @@
       e.target.classList.remove("edit-selecting");
     }
   }
-  document.body.addEventListener("mouseout", removeHighlight);
 
   // Show custom context menu at mouse location
   function showContextMenu(e) {
@@ -73,18 +77,16 @@
     }
 
     // Disable (or enable) context items
-    const committed = history.filter(change => !change.undid);
-    if(committed.length <= 1) {
+    if(history.filter(change => !change.undid).length <= 1) {
       container.querySelector(".undo").classList.add("disabled");
     }
-    if(history.length <= 1) {
+    if(history.filter(change => change.undid).length < 1) {
       container.querySelector(".redo").classList.add("disabled");
     }
     if(!selected) {
       container.querySelector(".delete").classList.add("disabled");
     }
   }
-  document.body.addEventListener("contextmenu", showContextMenu);
 
   // Select (or de-select) an element on click
   function selectElement(e) {
@@ -95,6 +97,7 @@
     // Stop the clicked element's normal click behavior
     e.preventDefault();
     e.stopImmediatePropagation();
+    // Hide normal right-click context menu
     const context = document.querySelector(".edit-context-container");
     if(!context.classList.contains("hidden")) {
       context.classList.add("hidden");
@@ -103,18 +106,19 @@
     if(resizing) {
       document.body.removeEventListener("mousemove", resize);
       resizing = false;
-      saveChanges("resize");
+      pushHistory("resize");
       return;
     }
     if(moving) {
       document.body.removeEventListener("mousemove", move);
       moving = false;
-      saveChanges("move");
+      pushHistory("move");
       return;
     }
     if(e.target.className.includes("edit-meta") || e.target.tagName === "BODY") {
       return;
     }
+
     // Select the element if it's different
     if(e.target !== selected) {
       // If already selecting an element, deselect it
@@ -127,7 +131,7 @@
       selected.style.position = "relative"; // This shouldn't be cleaned up, unlike classes
 
       // Add corners and mouse listeners
-      saveChanges("select");
+      pushHistory("select");
       positionCorners();
       selected.addEventListener("mousedown", startMove);
       selected.addEventListener("dragstart", preventDefaultDrag);
@@ -136,9 +140,27 @@
       deselect();
     }
   }
-  // Setting capture flag to true triggers event listeners from top to
-  // bottom in DOM tree (making this trigger before other click listeners)
-  document.body.addEventListener("click", selectElement, true);
+
+  function getElementIndices(element) {
+    currentNode = element;
+    indices = [];
+    // Continue looping until parent is the document body
+    while(currentNode.parentNode.tagName !== "HTML") {
+      // Get the currentNode's index in relation to its siblings
+      index = Array.from(currentNode.parentNode.children).indexOf(currentNode);
+      indices.unshift(index);
+      currentNode = currentNode.parentNode;
+    }
+    return indices;
+  }
+
+  function fromElementIndices(indices) {
+    currentNode = document.body;
+    for(let index of indices) {
+      currentNode = Array.from(currentNode.children)[index];
+    }
+    return currentNode;
+  }
 
   function preventDefaultDrag(e) {
     e.preventDefault();
@@ -146,7 +168,7 @@
 
   function deleteSelected(e) {
     if(selected) {
-      saveChanges("delete", { parent: selected.parentNode, sibling: selected.nextSibling });
+      pushHistory("delete", { parent: selected.parentNode, sibling: selected.nextSibling });
       selected.remove();
       document.querySelector(".edit-context-container").classList.add("hidden");
       document.querySelectorAll(".edit-corner").forEach(corner => corner.classList.add("hidden"));
@@ -161,16 +183,7 @@
       switch(currentChange.type) {
         case "resize":
         case "move":
-          const previousRect = committed[committed.length - 2].rect;
-          const parentRect = currentChange.element.parentNode.getBoundingClientRect();
-          currentChange.element.style.top = (previousRect.top - parentRect.top) + "px";
-          currentChange.element.style.left = (previousRect.left - parentRect.left) + "px";
-          currentChange.element.style.width = previousRect.width + "px";
-          currentChange.element.style.minWidth = previousRect.width + "px";
-          currentChange.element.style.maxWidth = previousRect.width + "px";
-          currentChange.element.style.height = previousRect.height + "px";
-          currentChange.element.style.minHeight = previousRect.height + "px";
-          currentChange.element.style.maxHeight = previousRect.height + "px";
+          setElementRect(committed[committed.length - 1].element, committed[committed.length - 2].rect);
           positionCorners();
           break;
         case "delete":
@@ -192,22 +205,13 @@
   }
 
   function redo(e) {
-    const latestUndone = history.findIndex(change => change.undid);
-    if(latestUndone >= 0) {
-      const nextChange = history[latestUndone];
+    const nextChangeIndex = history.findIndex(change => change.undid);
+    if(nextChangeIndex >= 0) {
+      const nextChange = history[nextChangeIndex];
       switch(nextChange.type) {
         case "resize":
         case "move":
-          const nextRect = nextChange.rect;
-          const parentRect = nextChange.element.parentNode.getBoundingClientRect();
-          nextChange.element.style.top = (nextRect.top - parentRect.top) + "px";
-          nextChange.element.style.left = (nextRect.left - parentRect.left) + "px";
-          nextChange.element.style.width = nextRect.width + "px";
-          nextChange.element.style.minWidth = nextRect.width + "px";
-          nextChange.element.style.maxWidth = nextRect.width + "px";
-          nextChange.element.style.height = nextRect.height + "px";
-          nextChange.element.style.minHeight = nextRect.height + "px";
-          nextChange.element.style.maxHeight = nextRect.height + "px";
+          setElementRect(nextChange.element, nextChange.rect);
           positionCorners();
           break;
         case "delete":
@@ -221,24 +225,16 @@
     document.querySelector(".edit-context-container").classList.add("hidden");
   }
 
-  function saveChanges(type, options) {
-    if(selected) {
-      // Delete all undone chnages
-      const latestUndone = history.findIndex(change => change.undid);
-      if(latestUndone >= 0) {
-        history.splice(latestUndone);
-      }
-      // Delete consecutive selections from history
-      if(history.length > 0 && history[history.length - 1].type === "select" && type === "select") {
-        history.pop();
-      }
-      // Cap history length;
-      if(history.length >= 10) {
-        history.shift();
-      }
-      history.push({ type: type, element: selected, rect: selected.getBoundingClientRect(),
-        undid: false, ...options });
-    }
+  function setElementRect(element, rect) {
+    const parentRect = element.parentNode.getBoundingClientRect();
+    element.style.top = (rect.top - parentRect.top + window.scrollY) + "px";
+    element.style.left = (rect.left - parentRect.left + window.scrollX) + "px";
+    element.style.width = rect.width + "px";
+    element.style.minWidth = rect.width + "px";
+    element.style.maxWidth = rect.width + "px";
+    element.style.height = rect.height + "px";
+    element.style.minHeight = rect.height + "px";
+    element.style.maxHeight = rect.height + "px";
   }
 
   function positionCorners() {
@@ -351,6 +347,50 @@
     }
   }
 
+  function pushHistory(type, options) {
+    if(selected) {
+      // Delete all undone chnages
+      const latestUndone = history.findIndex(change => change.undid);
+      if(latestUndone >= 0) {
+        history.splice(latestUndone);
+      }
+      // Delete consecutive selections from history
+      if(history.length > 0 && history[history.length - 1].type === "select" && type === "select") {
+        history.pop();
+      }
+      history.push({ type: type, element: selected, rect: selected.getBoundingClientRect(),
+        undid: false, ...options });
+    }
+  }
+
+  function saveChanges(saveIndex) {
+    changes = [];
+    for(let change of history) {
+      if(change.type === "select") {
+        // Destructuring properties to convert DOMRect into JS object
+        let {top, right, bottom, left, width, height, x, y} = change.element.getBoundingClientRect();
+        changes.push({
+          path: getElementIndices(change.element),
+          rect: {top, right, bottom, left, width, height, x, y}
+        });
+      }
+    }
+    browser.runtime.sendMessage({type: "save", changes: changes, saveIndex: saveIndex});
+    history = [];
+  }
+  
+  function loadChanges(saveIndex) {
+    deselect();
+    history = [];
+    browser.storage.local.get("saves").then(data => {
+      const save = data.saves[saveIndex];
+      for(let change of save.changes) {
+        let target = fromElementIndices(change.path);
+        setElementRect(target, change.rect);
+      }
+    });
+  }
+
   // Clean up event listeners when requested by popup
   function cleanup() {
     if(selected) {
@@ -365,13 +405,24 @@
     browser.runtime.onMessage.removeListener(cleanup);
   }
 
-  browser.runtime.onMessage.addListener(message => {
-    if(message === "cleanup") {
-      cleanup();
+  browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
+    switch(message.type) {
+      case "cleanup":
+        cleanup();
+        break;
+      case "save":
+        saveChanges(message.saveIndex);
+        break;
+      case "load":
+        loadChanges(message.saveIndex);
+        break;
+      case "getHistory":
+        sendResponse(history);
+        break;
     }
   })
 
   window.onbeforeunload = e => {
-    browser.runtime.sendMessage("unload");
+    browser.runtime.sendMessage({type: "unload"});
   }
 })()
