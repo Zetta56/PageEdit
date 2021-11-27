@@ -381,9 +381,9 @@
   
   function loadChanges(saveIndex) {
     deselect();
-    history = [];
     browser.storage.local.get("saves").then(data => {
       const save = data.saves[saveIndex];
+      history = save.changes;
       for(let change of save.changes) {
         let target = fromElementIndices(change.path);
         setElementRect(target, change.rect);
