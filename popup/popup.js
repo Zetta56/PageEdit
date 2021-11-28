@@ -57,6 +57,7 @@ async function upsertSave(index, changes) {
   }
   await browser.storage.local.set({saves: [...saves]})
   await populateSaves();
+  const test = await browser.storage.local.get("saves");
   loadState();
 }
 

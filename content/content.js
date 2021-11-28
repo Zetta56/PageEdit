@@ -6,6 +6,7 @@
   let moving = false;
   let selected = null;
   let history = [];
+
   initializeContextMenu();
   initializeCorners();
   document.body.addEventListener("mouseover", highlight);
@@ -47,8 +48,54 @@
   }
 
   // Add to a property in selected and return the result in pixels
-  function getChangedValue(propertyName, change) {
-    return (parseInt(getComputedStyle(selected)[propertyName]) + change) + "px";
+  function getChangedValue(element, property, change) {
+    return (parseInt(getComputedStyle(element)[property]) + change) + "px";
+  }
+
+  function getPositioningStyles(element) {
+    return {
+      top: element.style.top,
+      left: element.style.left,
+      width: element.style.width,
+      height: element.style.height,
+      marginBottom: element.style.marginBottom,
+      marginRight: element.style.marginRight
+    }
+  }
+
+  function applyStyles(element, styles) {
+    for(let property in styles) {
+      if(property === "width") {
+        element.style.minWidth = styles.width;
+        element.style.maxWidth = styles.width;
+      }
+      if(property === "height") {
+        element.style.minHeight = styles.height;
+        element.style.maxHeight = styles.height;
+      }
+      element.style[property] = styles[property];
+    }
+  }
+
+  function getDOMIndices(element) {
+    currentNode = element;
+    indices = [];
+    // Continue looping until parent is the document body
+    while(currentNode.parentNode.tagName !== "HTML") {
+      // Get the currentNode's index in relation to its siblings
+      index = Array.from(currentNode.parentNode.children).indexOf(currentNode);
+      indices.unshift(index);
+      currentNode = currentNode.parentNode;
+    }
+    return indices;
+  }
+
+  function fromDOMIndices(indices) {
+    currentNode = document.body;
+    for(let index of indices) {
+      currentNode = Array.from(currentNode.children)[index];
+    }
+    return currentNode;
   }
 
   // Highlight hovered elements
@@ -141,27 +188,6 @@
     }
   }
 
-  function getElementIndices(element) {
-    currentNode = element;
-    indices = [];
-    // Continue looping until parent is the document body
-    while(currentNode.parentNode.tagName !== "HTML") {
-      // Get the currentNode's index in relation to its siblings
-      index = Array.from(currentNode.parentNode.children).indexOf(currentNode);
-      indices.unshift(index);
-      currentNode = currentNode.parentNode;
-    }
-    return indices;
-  }
-
-  function fromElementIndices(indices) {
-    currentNode = document.body;
-    for(let index of indices) {
-      currentNode = Array.from(currentNode.children)[index];
-    }
-    return currentNode;
-  }
-
   function preventDefaultDrag(e) {
     e.preventDefault();
   }
@@ -177,13 +203,13 @@
   }
 
   function undo(e) {
-    const committed = history.filter(change => !change.undid);
-    if(committed.length >= 2) {
-      const currentChange = committed[committed.length - 1];
+    const notUndone = history.filter(change => !change.undid);
+    if(notUndone.length >= 2) {
+      const currentChange = notUndone[notUndone.length - 1];
       switch(currentChange.type) {
         case "resize":
         case "move":
-          setElementRect(committed[committed.length - 1].element, committed[committed.length - 2].rect);
+          applyStyles(currentChange.element, notUndone[notUndone.length - 2].styles);
           positionCorners();
           break;
         case "delete":
@@ -205,36 +231,23 @@
   }
 
   function redo(e) {
-    const nextChangeIndex = history.findIndex(change => change.undid);
-    if(nextChangeIndex >= 0) {
-      const nextChange = history[nextChangeIndex];
+    const undone = history.filter(change => change.undid);
+    if(undone.length > 0) {
+      const nextChange = undone[0];
       switch(nextChange.type) {
         case "resize":
         case "move":
-          setElementRect(nextChange.element, nextChange.rect);
+          applyStyles(nextChange.element, nextChange.styles);
           positionCorners();
           break;
         case "delete":
           nextChange.element.remove();
-          document.querySelectorAll(".edit-corner").forEach(corner => corner.classList.add("hidden"));
-          selected = null;
+          deselect();
           break;
       }
       nextChange.undid = false;
     }
     document.querySelector(".edit-context-container").classList.add("hidden");
-  }
-
-  function setElementRect(element, rect) {
-    const parentRect = element.parentNode.getBoundingClientRect();
-    element.style.top = (rect.top - parentRect.top + window.scrollY) + "px";
-    element.style.left = (rect.left - parentRect.left + window.scrollX) + "px";
-    element.style.width = rect.width + "px";
-    element.style.minWidth = rect.width + "px";
-    element.style.maxWidth = rect.width + "px";
-    element.style.height = rect.height + "px";
-    element.style.minHeight = rect.height + "px";
-    element.style.maxHeight = rect.height + "px";
   }
 
   function positionCorners() {
@@ -251,7 +264,6 @@
     }
   }
 
-  // Initialize resize variables
   function startResize(e) {
     resizeDirection = e.target.classList[0];
     mouseX = e.x;
@@ -260,51 +272,40 @@
     document.body.addEventListener("mousemove", resize);
   }
 
-  // Resize the selected element
   function resize(e) {
     // Make sure the user is holding down left-click (value of 1)
     if(e.buttons !== 1) {
       return;
     }
-    // Vertical sides
+    let styles = {};
+    // Change vertical styles
     if(resizeDirection.includes("top") || resizeDirection.includes("bottom")) {
-      let newHeight;
       let changeY = e.y - mouseY;
       mouseY = e.y;
-      // Top: add to top, subtract from height
       if(resizeDirection.includes("top")) {
-        newHeight = getChangedValue("height", -changeY);
-        selected.style.top = getChangedValue("top", changeY);
-        selected.style.marginBottom = -newHeight;
-      // Bottom: add to height
+        styles.height = getChangedValue(selected, "height", -changeY);
+        // Margin cancels out any missing/added space in document flow resulting from changed height
+        styles.marginBottom = getChangedValue(selected, "marginBottom", changeY);
+        styles.top = getChangedValue(selected, "top", changeY);
       } else {
-        newHeight = getChangedValue("height", changeY);
+        styles.height = getChangedValue(selected, "height", changeY);
+        styles.marginBottom = getChangedValue(selected, "marginBottom", -changeY);
       }
-      // Set new heights and mouse position
-      selected.style.height = newHeight;
-      selected.style.minHeight = newHeight;
-      selected.style.maxHeight = newHeight;
     }
-
-    // Horizontal sides
+    // Change horizontal styles
     if(resizeDirection.includes("left") || resizeDirection.includes("right")) {
-      let newWidth;
       let changeX = e.x - mouseX;
       mouseX = e.x;
-      // Left: add to left, subtract from width
       if(resizeDirection.includes("left")) {
-        newWidth = getChangedValue("width", -changeX);
-        selected.style.left = getChangedValue("left", changeX);
-        selected.style.marginRight = getChangedValue("marginRight", changeX);
-      // Right: add to width
+        styles.width = getChangedValue(selected, "width", -changeX);
+        styles.marginRight = getChangedValue(selected, "marginRight", changeX);
+        styles.left = getChangedValue(selected, "left", changeX);
       } else {
-        newWidth = getChangedValue("width", changeX);
+        styles.width = getChangedValue(selected, "width", changeX);
+        styles.marginRight = getChangedValue(selected, "marginRight", -changeX);
       }
-      // Set new widths
-      selected.style.width = newWidth;
-      selected.style.minWidth = newWidth;
-      selected.style.maxWidth = newWidth;
     }
+    applyStyles(selected, styles);
     positionCorners();
   }
 
@@ -358,7 +359,7 @@
       if(history.length > 0 && history[history.length - 1].type === "select" && type === "select") {
         history.pop();
       }
-      history.push({ type: type, element: selected, rect: selected.getBoundingClientRect(),
+      history.push({ type: type, element: selected, styles: getPositioningStyles(selected),
         undid: false, ...options });
     }
   }
@@ -367,16 +368,13 @@
     changes = [];
     for(let change of history) {
       if(change.type === "select") {
-        // Destructuring properties to convert DOMRect into JS object
-        let {top, right, bottom, left, width, height, x, y} = change.element.getBoundingClientRect();
         changes.push({
-          path: getElementIndices(change.element),
-          rect: {top, right, bottom, left, width, height, x, y}
+          path: getDOMIndices(change.element),
+          styles: getPositioningStyles(change.element)
         });
       }
     }
     browser.runtime.sendMessage({type: "save", changes: changes, saveIndex: saveIndex});
-    history = [];
   }
   
   function loadChanges(saveIndex) {
@@ -385,8 +383,10 @@
       const save = data.saves[saveIndex];
       history = save.changes;
       for(let change of save.changes) {
-        let target = fromElementIndices(change.path);
-        setElementRect(target, change.rect);
+        console.log(change)
+        let target = fromDOMIndices(change.path);
+        target.style.position = "relative";
+        applyStyles(target, change.styles);
       }
     });
   }
