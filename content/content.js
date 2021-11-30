@@ -90,7 +90,7 @@
     return indices;
   }
 
-  function fromDOMIndices(indices) {
+  function getElementByDOMIndices(indices) {
     currentNode = document.body;
     for(let index of indices) {
       currentNode = Array.from(currentNode.children)[index];
@@ -374,20 +374,11 @@
         });
       }
     }
-    browser.runtime.sendMessage({type: "save", changes: changes, saveIndex: saveIndex});
-  }
-  
-  function loadChanges(saveIndex) {
-    deselect();
-    browser.storage.local.get("saves").then(data => {
-      const save = data.saves[saveIndex];
-      history = save.changes;
-      for(let change of save.changes) {
-        console.log(change)
-        let target = fromDOMIndices(change.path);
-        target.style.position = "relative";
-        applyStyles(target, change.styles);
-      }
+    browser.runtime.sendMessage({
+      type: "save",
+      changes: changes,
+      url: window.location.href,
+      saveIndex: saveIndex
     });
   }
 
@@ -412,9 +403,6 @@
         break;
       case "save":
         saveChanges(message.saveIndex);
-        break;
-      case "load":
-        loadChanges(message.saveIndex);
         break;
       case "getHistory":
         sendResponse(history);

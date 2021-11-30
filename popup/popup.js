@@ -48,25 +48,29 @@ async function initializeSave() {
   browser.tabs.sendMessage(tabs[0].id, {type: "save", saveIndex: -1});
 }
 
-async function upsertSave(index, changes) {
+async function upsertSave(message) {
   const {saves} = await browser.storage.local.get("saves");
-  if(index === -1) {
-    saves.push({ name: "placeholder", changes: changes });
+  const newSave = {
+    name: "placeholder",
+    changes: message.changes,
+    url: message.url
+  };
+  if(message.saveIndex === -1) {
+    saves.push(newSave);
   } else {
-    saves[index] = { name: "placeholder", changes: changes };
+    saves[message.saveIndex] = newSave;
   }
   await browser.storage.local.set({saves: [...saves]})
   await populateSaves();
-  const test = await browser.storage.local.get("saves");
   loadState();
 }
 
-// Add event listeners
+// Run the above functions
 loadState();
 editButton.addEventListener("click", toggleEditor);
 newSaveButton.addEventListener("click", initializeSave);
 browser.runtime.onMessage.addListener(message => {
   if(message.type === "save") {
-    upsertSave(message.saveIndex, message.changes);
+    upsertSave(message);
   }
 });
