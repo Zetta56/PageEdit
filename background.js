@@ -1,12 +1,15 @@
 browser.runtime.onInstalled.addListener(() => {
   browser.storage.local.set({
-    editing: false,
+    editingTabs: [],
     saves: []
   });
 });
 
-browser.runtime.onMessage.addListener(message => {
+browser.runtime.onMessage.addListener(async (message) => {
   if(message.type === "unload") {
-    browser.storage.local.set({editing: false});
+    console.log("a")
+    const {editingTabs} = await browser.storage.local.get("editingTabs");
+    const newEditingTabs = editingTabs.filter(id => id !== tabs[0].id);
+    browser.storage.local.set({editingTabs: newEditingTabs});
   }
 })

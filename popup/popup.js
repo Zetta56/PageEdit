@@ -4,10 +4,10 @@ let saves = document.querySelectorAll(".save");
 let newSaveButton = document.querySelector(".new-save-btn");
 
 async function loadState() {
-  let {editing} = await browser.storage.local.get("editing");
-  if(editing) {
+  let {editingTabs} = await browser.storage.local.get("editingTabs");
+  let tabs = await browser.tabs.query({active: true, currentWindow: true});
+  if(editingTabs.includes(tabs[0].id)) {
     editButton.src = "/images/edit-active.png";
-    let tabs = await browser.tabs.query({active: true, currentWindow: true});
     let history = await browser.tabs.sendMessage(tabs[0].id, {type: "getHistory"});
     toggleSaveButtons(history.length > 0);
   } else {
@@ -28,19 +28,20 @@ function toggleSaveButtons(toggle) {
 }
 
 async function toggleEditor() {
-  let {editing} = await browser.storage.local.get("editing");
+  let {editingTabs} = await browser.storage.local.get("editingTabs");
   let tabs = await browser.tabs.query({active: true, currentWindow: true});
-  if(!editing) {
+  if(!editingTabs.includes(tabs[0].id)) {
     editButton.src = "/images/edit-active.png";
     browser.tabs.executeScript({file: "/content/content.js"});
     browser.tabs.insertCSS({file: "/content/content.css"});
+    browser.storage.local.set({editingTabs: [...editingTabs, tabs[0].id]});
   } else {
     editButton.src = "/images/edit-inactive.png";
     browser.tabs.sendMessage(tabs[0].id, {type: "cleanup"});
     browser.tabs.removeCSS(tabs[0].id, {file: "/content/content.css"});
+    browser.storage.local.set({editingTabs: editingTabs.filter(id => id !== tabs[0].id)});
     toggleSaveButtons(false);
   }
-  browser.storage.local.set({editing: !editing});
 }
 
 async function initializeSave() {
