@@ -1,20 +1,45 @@
 (function() {
-  let resizeDirection = "";
-  let mouseX = 0;
-  let mouseY = 0;
-  let resizing = false;
-  let moving = false;
-  let selected = null;
-  let history = [];
+  let resizeDirection;
+  let mouseX;
+  let mouseY;
+  let resizing;
+  let moving;
+  let selected;
+  let history;
 
-  initializeContextMenu();
-  initializeCorners();
-  document.body.addEventListener("mouseover", highlight);
-  document.body.addEventListener("mouseout", removeHighlight);
-  document.body.addEventListener("contextmenu", showContextMenu);
-  // Setting capture flag to true triggers event listeners from top to
-  // bottom in DOM tree (making this trigger before other click listeners)
-  document.body.addEventListener("click", selectElement, true);
+  function initialize() {
+    resizeDirection = "";
+    mouseX = 0;
+    mouseY = 0;
+    resizing = false;
+    moving = false;
+    selected = null;
+    
+    initializeHistory();
+    initializeContextMenu();
+    initializeCorners();
+
+    document.body.addEventListener("mouseover", highlight);
+    document.body.addEventListener("mouseout", removeHighlight);
+    document.body.addEventListener("contextmenu", showContextMenu);
+    // Setting capture flag to true triggers event listeners from top to
+    // bottom in DOM tree (making this trigger before other click listeners)
+    document.body.addEventListener("click", selectElement, true);
+  }
+
+  function initializeHistory() {
+    // Triggered if opening editor again on the same page
+    if(history) {
+      return;
+    }
+    // Triggered if the user loaded a save using loadSave.js
+    if(typeof loadedHistory !== "undefined") {
+      history = loadedHistory;
+      loadedHistory = undefined;
+      return;
+    }
+    history = [];
+  }
 
   function initializeContextMenu() {
     // Context Menu Container
@@ -90,24 +115,26 @@
     return indices;
   }
 
-  function getElementByDOMIndices(indices) {
-    currentNode = document.body;
-    for(let index of indices) {
-      currentNode = Array.from(currentNode.children)[index];
+  function hasClass(e, pattern) {
+    const className = e.target.getAttribute("class");
+    if(className) {
+      return className.includes(pattern);
+    } else {
+      // This will return false if event's target has no classes
+      return false;
     }
-    return currentNode;
   }
 
   // Highlight hovered elements
   function highlight(e) {
-    if(!selected && !e.target.className.includes("edit-meta")) {
+    if(!selected && !hasClass(e, "edit-meta")) {
       e.target.classList.add("edit-selecting");
     }
   }
 
   // Stop highlighting when user stops hovering over element
   function removeHighlight(e) {
-    if(!selected && !e.target.className.includes("edit-meta")) {
+    if(!selected && !hasClass(e, "edit-meta")) {
       e.target.classList.remove("edit-selecting");
     }
   }
@@ -124,10 +151,10 @@
     }
 
     // Disable (or enable) context items
-    if(history.filter(change => !change.undid).length <= 1) {
+    if(history.filter(change => !change.undid && !change.fromSave).length <= 1) {
       container.querySelector(".undo").classList.add("disabled");
     }
-    if(history.filter(change => change.undid).length < 1) {
+    if(history.filter(change => change.undid && !change.fromSave).length < 1) {
       container.querySelector(".redo").classList.add("disabled");
     }
     if(!selected) {
@@ -138,7 +165,7 @@
   // Select (or de-select) an element on click
   function selectElement(e) {
     // Super Exclusions with default behaviors that shouldn't be ignored
-    if(e.target.className.includes("edit-context")) {
+    if(hasClass(e, "edit-context")) {
       return;
     }
     // Stop the clicked element's normal click behavior
@@ -162,7 +189,7 @@
       pushHistory("move");
       return;
     }
-    if(e.target.className.includes("edit-meta") || e.target.tagName === "BODY") {
+    if(hasClass(e, "edit-meta") || e.target.tagName === "BODY") {
       return;
     }
 
@@ -194,7 +221,7 @@
 
   function deleteSelected(e) {
     if(selected) {
-      pushHistory("delete", { parent: selected.parentNode, sibling: selected.nextSibling });
+      pushHistory("delete", {path: getDOMIndices(selected)});
       selected.remove();
       document.querySelector(".edit-context-container").classList.add("hidden");
       document.querySelectorAll(".edit-corner").forEach(corner => corner.classList.add("hidden"));
@@ -203,7 +230,7 @@
   }
 
   function undo(e) {
-    const notUndone = history.filter(change => !change.undid);
+    const notUndone = history.filter(change => !change.undid && !change.fromSave);
     if(notUndone.length >= 2) {
       const currentChange = notUndone[notUndone.length - 1];
       switch(currentChange.type) {
@@ -213,12 +240,19 @@
           positionCorners();
           break;
         case "delete":
-          // Try to re-insert the deleted element in the correct order
-          if(currentChange.sibling) {
-            currentChange.parent.insertBefore(currentChange.element, currentChange.sibling);
-          } else {
-            currentChange.parent.appendChild(currentChange.element);
+          let target = document.body;
+          for(let i = 0; i < currentChange.path.length; i++) {
+            // Target is changed element's parent in the second to last loop
+            if(i === currentChange.path.length - 1 && target.childElementCount === 0) {
+                target.appendChild(currentChange.element);
+            } else if(i === currentChange.path.length - 1) {
+              target.insertBefore(currentChange.element, target.children[i]);
+            } else {
+            // Offsetting by 1 because HTMLCollection indices start from 1 instead of 0
+            target = target.children[i + 1];
+            }
           }
+          // Simulating re-select
           selected = currentChange.element;
           selected.addEventListener("mousedown", startMove);
           selected.addEventListener("dragstart", preventDefaultDrag);
@@ -231,7 +265,7 @@
   }
 
   function redo(e) {
-    const undone = history.filter(change => change.undid);
+    const undone = history.filter(change => change.undid && !change.fromSave);
     if(undone.length > 0) {
       const nextChange = undone[0];
       switch(nextChange.type) {
@@ -356,7 +390,8 @@
         history.splice(latestUndone);
       }
       // Delete consecutive selections from history
-      if(history.length > 0 && history[history.length - 1].type === "select" && type === "select") {
+      const previousChange = history[history.length - 1];
+      if(history.length > 0 && type === "select" && previousChange.type === "select" && !previousChange.fromSave) {
         history.pop();
       }
       history.push({ type: type, element: selected, styles: getPositioningStyles(selected),
@@ -365,12 +400,27 @@
   }
 
   function saveChanges(saveIndex) {
+    // Construct changes array that will be stored and loaded from a save
     changes = [];
     for(let change of history) {
-      if(change.type === "select") {
+      if(change.fromSave) {
+        changes.push(change);
+        continue;
+      }
+      // Getting 'select' changes removes bloat from consecutive moves and resizes 
+      // Also checking parentNode to see if element was deleted
+      if(change.type === "select" && change.element.parentNode) {
         changes.push({
           path: getDOMIndices(change.element),
-          styles: getPositioningStyles(change.element)
+          styles: getPositioningStyles(change.element),
+          type: change.type,
+          fromSave: true
+        });
+      } else if(change.type === "delete") {
+        changes.push({
+          path: change.path,
+          type: change.type,
+          fromSave: true
         });
       }
     }
@@ -393,19 +443,26 @@
     document.body.removeEventListener("mouseout", removeHighlight);
     document.body.removeEventListener("click", selectElement, true);
     document.body.removeEventListener("contextmenu", showContextMenu);
-    browser.runtime.onMessage.removeListener(cleanup);
   }
 
   browser.runtime.onMessage.addListener((message, sender, sendResponse) => {
     switch(message.type) {
-      case "cleanup":
-        cleanup();
+      case "initialize":
+        initialize();
         break;
       case "save":
         saveChanges(message.saveIndex);
         break;
-      case "getHistory":
-        sendResponse(history);
+      case "getHistoryLength":
+        if(history) {
+          sendResponse(history.filter(change => !change.fromSave).length);
+        } else {
+          sendResponse(0);
+        }
+        break;
+        
+      case "cleanup":
+        cleanup();
         break;
     }
   })

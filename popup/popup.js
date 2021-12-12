@@ -1,22 +1,22 @@
 // Get references
 let editButton = document.querySelector("#edit-btn");
-let saves = document.querySelectorAll(".save");
 let newSaveButton = document.querySelector(".new-save-btn");
+
 
 async function loadState() {
   let {editingTabs} = await browser.storage.local.get("editingTabs");
   let tabs = await browser.tabs.query({active: true, currentWindow: true});
   if(editingTabs.includes(tabs[0].id)) {
     editButton.src = "/images/edit-active.png";
-    let history = await browser.tabs.sendMessage(tabs[0].id, {type: "getHistory"});
-    toggleSaveButtons(history.length > 0);
+    let historyLength = await browser.tabs.sendMessage(tabs[0].id, {type: "getHistoryLength"});
+    toggleSaveButtons(historyLength > 0);
   } else {
     toggleSaveButtons(false);
   }
 }
 
 function toggleSaveButtons(toggle) {
-  // Converting to array to gain access to 'map' function
+  // Querying elements here in case save buttons aren't populated when this file initially runs
   let saveButtons = Array.from(document.querySelectorAll(".save-btn"));
   if(toggle) {
     saveButtons.map(button => button.classList.remove("disabled"));
@@ -32,7 +32,7 @@ async function toggleEditor() {
   let tabs = await browser.tabs.query({active: true, currentWindow: true});
   if(!editingTabs.includes(tabs[0].id)) {
     editButton.src = "/images/edit-active.png";
-    browser.tabs.executeScript({file: "/content/content.js"});
+    browser.tabs.sendMessage(tabs[0].id, {type: "initialize"});
     browser.tabs.insertCSS({file: "/content/content.css"});
     browser.storage.local.set({editingTabs: [...editingTabs, tabs[0].id]});
   } else {
@@ -63,10 +63,10 @@ async function upsertSave(message) {
   }
   await browser.storage.local.set({saves: [...saves]})
   await populateSaves();
-  loadState();
+  toggleEditor();
 }
 
-// Run the above functions
+// Runners
 loadState();
 editButton.addEventListener("click", toggleEditor);
 newSaveButton.addEventListener("click", initializeSave);

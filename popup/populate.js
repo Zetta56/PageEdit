@@ -1,3 +1,4 @@
+// This file will run before popup.js
 let savesContainer = document.querySelector("#saves");
 
 async function populateSaves() {
@@ -12,6 +13,7 @@ async function populateSaves() {
         <img src="/images/trash.png" class="remove-btn" />
       </div>`
     );
+    
     // Add click listeners
     let saveButton = savesContainer.childNodes[i].querySelector(".save-btn");
     saveButton.addEventListener("click", async () => {
@@ -21,10 +23,10 @@ async function populateSaves() {
 
     let loadButton = savesContainer.childNodes[i].querySelector(".load-btn");
     loadButton.addEventListener("click", async () => {
-      await browser.tabs.create({ url: saves[i].url });
-      let tabs = await browser.tabs.query({active: true, currentWindow: true});
-      await browser.tabs.executeScript(tabs[0].id, { file: "/content/loadSave.js" });
-      browser.tabs.sendMessage(tabs[0].id, {type: "load", saveIndex: i});
+      let tab = await browser.tabs.create({ url: saves[i].url });
+      await browser.tabs.executeScript(tab.id, { file: "/content/loadSave.js" });
+      await browser.tabs.sendMessage(tab.id, {type: "load", saveIndex: i});
+      window.close();
     });
     
     let removeButton = savesContainer.childNodes[i].querySelector(".remove-btn");

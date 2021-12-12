@@ -1,4 +1,6 @@
 (function() {
+  loadedHistory = [];
+
   function getElementByDOMIndices(indices) {
     currentNode = document.body;
     for(let index of indices) {
@@ -24,11 +26,19 @@
   browser.runtime.onMessage.addListener(async (message) => {
     if(message.type === "load") {
       const {saves} = await browser.storage.local.get("saves")
-      for(let change of saves[message.saveIndex].changes) {
+      const changes = saves[message.saveIndex].changes;
+      for(let change of changes) {
         let target = getElementByDOMIndices(change.path);
-        target.style.position = "relative";
-        applyStyles(target, change.styles);
+        switch(change.type) {
+          case "select":
+            target.style.position = "relative";
+            applyStyles(target, change.styles);
+            break;
+          case "delete":
+            target.remove();
+        }
       }
+      loadedHistory = changes
     }
   });
 })();

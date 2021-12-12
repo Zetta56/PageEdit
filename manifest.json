@@ -7,6 +7,12 @@
   "background": {
     "scripts": ["background.js"]
   },
+  "content_scripts": [
+    {
+      "matches": ["<all_urls>"],
+      "js": ["/content/content.js"]
+    }
+  ],
   "browser_action": {
     "default_title": "Page Edit",
     "default_popup": "/popup/popup.html",
