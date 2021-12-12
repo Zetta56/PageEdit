@@ -9,10 +9,17 @@
       <img src="/images/edit-inactive.png" title="Enter page editor" id="edit-btn" />
     </div>
     <div class="title">Saves</div>
-    <div class="new-save-btn">+ Create New Save</div>
+    <div class="create-container">
+      <div class="show-form-btn">+ Create New Save</div>
+      <div class="create-form">
+        <div class="back-btn">&lt;</div>
+        <input class="name-input" type="text" placeholder="Save Name..." />
+        <div class="create-btn">Save</div>
+      </div>
+    </div>
     <div id="saves"></div>
-    <!-- Scripts are down here because they find DOM elements when loaded -->
-    <script src="/popup/populate.js"></script>
-    <script src="/popup/popup.js"></script>
+    <!-- Scripts are down here because they find DOM elements when executed -->
+    <script src="/popup/populate.js" type="module"></script>
+    <script src="/popup/popup.js" type="module"></script>
   </body>
 </html>

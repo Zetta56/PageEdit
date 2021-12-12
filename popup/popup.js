@@ -1,7 +1,11 @@
-// Get references
-let editButton = document.querySelector("#edit-btn");
-let newSaveButton = document.querySelector(".new-save-btn");
+import { populateSaves } from "/popup/populate.js";
 
+let editButton = document.querySelector("#edit-btn");
+let showFormButton = document.querySelector(".show-form-btn");
+let createForm = document.querySelector(".create-form");
+let backButton = document.querySelector(".back-btn");
+let nameInput = document.querySelector(".name-input");
+let createButton = document.querySelector(".create-btn");
 
 async function loadState() {
   let {editingTabs} = await browser.storage.local.get("editingTabs");
@@ -20,10 +24,10 @@ function toggleSaveButtons(toggle) {
   let saveButtons = Array.from(document.querySelectorAll(".save-btn"));
   if(toggle) {
     saveButtons.map(button => button.classList.remove("disabled"));
-    newSaveButton.classList.remove("disabled");
+    showFormButton.classList.remove("disabled");
   } else {
     saveButtons.map(button => button.classList.add("disabled"));
-    newSaveButton.classList.add("disabled");
+    showFormButton.classList.add("disabled");
   }
 }
 
@@ -44,24 +48,28 @@ async function toggleEditor() {
   }
 }
 
-async function initializeSave() {
-  let tabs = await browser.tabs.query({active: true, currentWindow: true});
-  browser.tabs.sendMessage(tabs[0].id, {type: "save", saveIndex: -1});
+function toggleCreateForm(toggle) {
+  if(toggle) {
+    showFormButton.style.right = "100vw";
+    createForm.style.left = 0;
+  } else {
+    showFormButton.style.right = 0;
+    createForm.style.left = "100vw";
+  }
 }
 
-async function upsertSave(message) {
+async function upsertSave(saveIndex) {
   const {saves} = await browser.storage.local.get("saves");
-  const newSave = {
-    name: "placeholder",
-    changes: message.changes,
-    url: message.url
-  };
-  if(message.saveIndex === -1) {
-    saves.push(newSave);
+  const tabs = await browser.tabs.query({active: true, currentWindow: true});
+  const changes = await browser.tabs.sendMessage(tabs[0].id, {type: "getChanges"});
+  if(saveIndex === -1) {
+    console.log(nameInput.value)
+    saves.push({ name: nameInput.value, changes: changes, url: tabs[0].url });
+    nameInput.value = "";
   } else {
-    saves[message.saveIndex] = newSave;
+    saves[saveIndex] = { name: saves[saveIndex].name, changes: changes, url: tabs[0].url };
   }
-  await browser.storage.local.set({saves: [...saves]})
+  await browser.storage.local.set({saves: saves})
   await populateSaves();
   toggleEditor();
 }
@@ -69,9 +77,8 @@ async function upsertSave(message) {
 // Runners
 loadState();
 editButton.addEventListener("click", toggleEditor);
-newSaveButton.addEventListener("click", initializeSave);
-browser.runtime.onMessage.addListener(message => {
-  if(message.type === "save") {
-    upsertSave(message);
-  }
-});
+showFormButton.addEventListener("click", () => toggleCreateForm(true));
+backButton.addEventListener("click", () => toggleCreateForm(false));
+createButton.addEventListener("click", () => upsertSave(-1));
+
+export { upsertSave };

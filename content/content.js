@@ -399,23 +399,24 @@
     }
   }
 
-  function saveChanges(saveIndex) {
+  function cleanChanges() {
     // Construct changes array that will be stored and loaded from a save
     changes = [];
     for(let change of history) {
       if(change.fromSave) {
         changes.push(change);
         continue;
-      }
-      // Getting 'select' changes removes bloat from consecutive moves and resizes 
-      // Also checking parentNode to see if element was deleted
-      if(change.type === "select" && change.element.parentNode) {
-        changes.push({
-          path: getDOMIndices(change.element),
-          styles: getPositioningStyles(change.element),
-          type: change.type,
-          fromSave: true
-        });
+      // Getting 'select' changes removes bloat from consecutive moves and resizes
+      } else if(change.type === "select") {
+        try {
+          changes.push({
+            path: getDOMIndices(change.element),
+            styles: getPositioningStyles(change.element),
+            type: change.type,
+            fromSave: true
+          });
+        // Catch if element's DOM indices couldn't be obtained, due to element deletion
+        } catch(e) {};
       } else if(change.type === "delete") {
         changes.push({
           path: change.path,
@@ -424,12 +425,7 @@
         });
       }
     }
-    browser.runtime.sendMessage({
-      type: "save",
-      changes: changes,
-      url: window.location.href,
-      saveIndex: saveIndex
-    });
+    return changes;
   }
 
   // Clean up event listeners when requested by popup
@@ -450,17 +446,13 @@
       case "initialize":
         initialize();
         break;
-      case "save":
-        saveChanges(message.saveIndex);
+      case "getChanges":
+        sendResponse(cleanChanges());
         break;
       case "getHistoryLength":
-        if(history) {
-          sendResponse(history.filter(change => !change.fromSave).length);
-        } else {
-          sendResponse(0);
-        }
+        const length = history ? history.filter(change => !change.fromSave).length : 0;
+        sendResponse(length);
         break;
-        
       case "cleanup":
         cleanup();
         break;

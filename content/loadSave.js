@@ -4,7 +4,7 @@
   function getElementByDOMIndices(indices) {
     currentNode = document.body;
     for(let index of indices) {
-      currentNode = Array.from(currentNode.children)[index];
+      currentNode = currentNode.children[index];
     }
     return currentNode;
   }

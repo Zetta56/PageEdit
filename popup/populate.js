@@ -1,4 +1,6 @@
 // This file will run before popup.js
+import { upsertSave } from "/popup/popup.js";
+
 let savesContainer = document.querySelector("#saves");
 
 async function populateSaves() {
@@ -16,10 +18,8 @@ async function populateSaves() {
     
     // Add click listeners
     let saveButton = savesContainer.childNodes[i].querySelector(".save-btn");
-    saveButton.addEventListener("click", async () => {
-      let tabs = await browser.tabs.query({active: true, currentWindow: true});
-      browser.tabs.sendMessage(tabs[0].id, {type: "save", saveIndex: i});
-    });
+    // Running this only on-click prevents circular function calls 
+    saveButton.addEventListener("click", () => upsertSave(i));
 
     let loadButton = savesContainer.childNodes[i].querySelector(".load-btn");
     loadButton.addEventListener("click", async () => {
@@ -38,3 +38,5 @@ async function populateSaves() {
   }
 }
 populateSaves();
+
+export { populateSaves };
