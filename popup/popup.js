@@ -52,9 +52,11 @@ function toggleCreateForm(toggle) {
   if(toggle) {
     showFormButton.style.right = "100vw";
     createForm.style.left = 0;
+    createForm.style.opacity = 1;
   } else {
     showFormButton.style.right = 0;
     createForm.style.left = "100vw";
+    createForm.style.opacity = 0;
   }
 }
 
@@ -63,7 +65,6 @@ async function upsertSave(saveIndex) {
   const tabs = await browser.tabs.query({active: true, currentWindow: true});
   const changes = await browser.tabs.sendMessage(tabs[0].id, {type: "getChanges"});
   if(saveIndex === -1) {
-    console.log(nameInput.value)
     saves.push({ name: nameInput.value, changes: changes, url: tabs[0].url });
     nameInput.value = "";
   } else {
@@ -79,6 +80,11 @@ loadState();
 editButton.addEventListener("click", toggleEditor);
 showFormButton.addEventListener("click", () => toggleCreateForm(true));
 backButton.addEventListener("click", () => toggleCreateForm(false));
-createButton.addEventListener("click", () => upsertSave(-1));
+createButton.addEventListener("click", () => {
+  if(nameInput.value.length > 0) {
+    upsertSave(-1);
+    toggleCreateForm();
+  }
+});
 
 export { upsertSave };

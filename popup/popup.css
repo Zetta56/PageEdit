@@ -38,30 +38,46 @@ img {
 /* Create */
 .create-container {
   position: relative;
-  margin-top: 1.25rem;
-}
-.show-form-btn,
-.create-form {
-  position: absolute;
-  width: 100vw;
-  transition: 500ms;
+  margin-top: 1rem;
 }
 .show-form-btn {
+  position: absolute;
+  width: 100vw;
   right: 0;
+  transition: right 250ms;
 }
 .create-form {
+  position: absolute;
   display: flex;
-  left: 100vw;
   justify-content: space-around;
+  align-items: center;
+  width: 100vw;
+  left: 100vw;
+  opacity: 0;
+  transition: left 250ms, opacity 250ms;
 }
 .back-btn {
-  background-color: transparent;
-  border: none;
+  margin: 0 0.5rem;
+  font-weight: bold;
+}
+.back-btn img {
+  width: 0.75rem;
+  height: 1rem;
+}
+.name-input {
+  flex-grow: 2;
+  border: 1px solid lightgrey;
+  padding: 0.25rem;
+  border-radius: 0.25rem;
+}
+.create-btn {
+  color: #1a60c7;
+  margin: 0 0.5rem;
 }
 
 /* Saves */
 #saves {
-  margin-top: 3rem;
+  margin-top: 4rem;
   height: 16rem;
   overflow-y: scroll;
 }

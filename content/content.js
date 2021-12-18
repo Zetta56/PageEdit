@@ -117,12 +117,8 @@
 
   function hasClass(e, pattern) {
     const className = e.target.getAttribute("class");
-    if(className) {
-      return className.includes(pattern);
-    } else {
-      // This will return false if event's target has no classes
-      return false;
-    }
+    // This will return false if event's target has no classes
+    return className ? className.includes(pattern) : false;
   }
 
   // Highlight hovered elements
@@ -418,11 +414,7 @@
         // Catch if element's DOM indices couldn't be obtained, due to element deletion
         } catch(e) {};
       } else if(change.type === "delete") {
-        changes.push({
-          path: change.path,
-          type: change.type,
-          fromSave: true
-        });
+        changes.push({ path: change.path, type: change.type, fromSave: true });
       }
     }
     return changes;
