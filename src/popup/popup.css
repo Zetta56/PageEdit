@@ -38,10 +38,10 @@ img {
 /* Create */
 .create-container {
   position: relative;
-  margin-top: 1rem;
 }
 .show-form-btn {
   position: absolute;
+  margin-top: 1rem;
   width: 100vw;
   right: 0;
   transition: right 250ms;
@@ -51,6 +51,7 @@ img {
   display: flex;
   justify-content: space-around;
   align-items: center;
+  margin-top: 0.5rem;
   width: 100vw;
   left: 100vw;
   opacity: 0;
@@ -77,7 +78,7 @@ img {
 
 /* Saves */
 #saves {
-  margin-top: 4rem;
+  margin-top: 3.5rem;
   height: 16rem;
   overflow-y: scroll;
 }
@@ -91,6 +92,8 @@ img {
 .save .load-btn {
   display: inline-block;
   width: 10rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 .save img {
   width: 1rem;

@@ -5,17 +5,17 @@
   "manifest_version": 2,
   "permissions": ["tabs", "<all_urls>", "storage"],
   "background": {
-    "scripts": ["background.js"]
+    "scripts": ["/src/background/background.js"]
   },
   "content_scripts": [
     {
       "matches": ["<all_urls>"],
-      "js": ["/content/content.js"]
+      "js": ["/src/content/content.js"]
     }
   ],
   "browser_action": {
     "default_title": "Page Edit",
-    "default_popup": "/popup/popup.html",
+    "default_popup": "/src/popup/popup.html",
     "default_icon": "/images/logo.png"
   },
   "icons": {

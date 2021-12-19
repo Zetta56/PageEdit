@@ -1,4 +1,4 @@
-import { populateSaves } from "/popup/populate.js";
+import { populateSaves } from "/src/popup/populate.js";
 
 let editButton = document.querySelector("#edit-btn");
 let showFormButton = document.querySelector(".show-form-btn");
@@ -37,12 +37,12 @@ async function toggleEditor() {
   if(!editingTabs.includes(tabs[0].id)) {
     editButton.src = "/images/edit-active.png";
     browser.tabs.sendMessage(tabs[0].id, {type: "initialize"});
-    browser.tabs.insertCSS({file: "/content/content.css"});
+    browser.tabs.insertCSS({file: "/src/content/content.css"});
     browser.storage.local.set({editingTabs: [...editingTabs, tabs[0].id]});
   } else {
     editButton.src = "/images/edit-inactive.png";
     browser.tabs.sendMessage(tabs[0].id, {type: "cleanup"});
-    browser.tabs.removeCSS(tabs[0].id, {file: "/content/content.css"});
+    browser.tabs.removeCSS(tabs[0].id, {file: "/src/content/content.css"});
     browser.storage.local.set({editingTabs: editingTabs.filter(id => id !== tabs[0].id)});
     toggleSaveButtons(false);
   }
