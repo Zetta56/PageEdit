@@ -18,7 +18,13 @@
       </div>
     </div>
     <div id="saves"></div>
-    <!-- Scripts are down here because they find DOM elements when executed -->
+    <!-- divs must be right next to template tags to avoid cloning newlines in JS -->
+    <template id="save-template"><div class="save">
+      <img src="/images/save.png" class="save-btn" />
+      <span class="load-btn"></span>
+      <img src="/images/trash.png" class="remove-btn" />
+    </div></template>
+    <!-- Scripts are in the body because they find DOM elements when executed -->
     <script src="/src/popup/populate.js" type="module"></script>
     <script src="/src/popup/popup.js" type="module"></script>
   </body>

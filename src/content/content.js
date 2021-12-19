@@ -56,7 +56,7 @@
     for(let item of items) {
       let itemDiv = document.createElement("div");
       itemDiv.classList.add("edit-context-item", "edit-meta", item.name);
-      itemDiv.innerHTML = item.label;
+      itemDiv.textContent = item.label;
       itemDiv.addEventListener("click", item.action);
       container.appendChild(itemDiv);
     }
