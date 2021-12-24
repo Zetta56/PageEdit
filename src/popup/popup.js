@@ -1,12 +1,14 @@
-import { populateSaves } from "/src/popup/populate.js";
+// Get popup references
+const editButton = document.querySelector("#edit-btn");
+const showFormButton = document.querySelector(".show-form-btn");
+const createForm = document.querySelector(".create-form");
+const backButton = document.querySelector(".back-btn");
+const nameInput = document.querySelector(".name-input");
+const createButton = document.querySelector(".create-btn");
+const savesContainer = document.querySelector("#saves");
+const saveTemplate = document.querySelector("#save-template");
 
-let editButton = document.querySelector("#edit-btn");
-let showFormButton = document.querySelector(".show-form-btn");
-let createForm = document.querySelector(".create-form");
-let backButton = document.querySelector(".back-btn");
-let nameInput = document.querySelector(".name-input");
-let createButton = document.querySelector(".create-btn");
-
+// Decide whether save buttons and edit button are on/off
 async function loadState() {
   let {editingTabs} = await browser.storage.local.get("editingTabs");
   let tabs = await browser.tabs.query({active: true, currentWindow: true});
@@ -19,9 +21,43 @@ async function loadState() {
   }
 }
 
+function populateSaves() {
+  browser.storage.local.get("saves").then(({saves}) => {
+    savesContainer.querySelectorAll("*").forEach(child => child.remove());
+    for(let i = 0; i < saves.length; i++) {
+      // Add HTML nodes
+      let clone = saveTemplate.content.cloneNode(true);
+      let saveButton = clone.querySelector(".save-btn");
+      let loadButton = clone.querySelector(".load-btn");
+      let removeButton = clone.querySelector(".remove-btn");
+      loadButton.textContent = saves[i].name;
+      loadButton.title = saves[i].name;
+      savesContainer.appendChild(clone);
+      
+      // Add click listeners
+      saveButton.addEventListener("click", () => upsertSave(i));
+      loadButton.addEventListener("click", async () => {
+        // This entire function will run before content.js is executed on the new tab
+        let tab = await browser.tabs.create({ url: saves[i].url });
+        await browser.tabs.executeScript(tab.id, { file: "/src/content/loadSave.js" });
+        await browser.tabs.sendMessage(tab.id, {type: "load", changes: saves[i].changes});
+        window.close();
+      });
+      removeButton.addEventListener("click", async () => {
+        savesContainer.removeChild(savesContainer.childNodes[i]);
+        let newSaves = saves.filter((save, index) => index !== i);
+        await browser.storage.local.set({saves: newSaves});
+        // Reloading saves to update their indices
+        populateSaves();
+        loadState();
+      });
+    }
+  });
+}
+
 function toggleSaveButtons(toggle) {
-  // Querying elements here in case save buttons aren't populated when this file initially runs
-  let saveButtons = Array.from(document.querySelectorAll(".save-btn"));
+  // Getting saveButtons in here in case any save has been created since popup load
+  const saveButtons = Array.from(document.querySelectorAll(".save-btn"));
   if(toggle) {
     saveButtons.map(button => button.classList.remove("disabled"));
     showFormButton.classList.remove("disabled");
@@ -71,11 +107,12 @@ async function upsertSave(saveIndex) {
     saves[saveIndex] = { name: saves[saveIndex].name, changes: changes, url: tabs[0].url };
   }
   await browser.storage.local.set({saves: saves})
-  await populateSaves();
+  populateSaves();
   toggleEditor();
 }
 
 // Runners
+populateSaves();
 loadState();
 editButton.addEventListener("click", toggleEditor);
 showFormButton.addEventListener("click", () => toggleCreateForm(true));
@@ -86,5 +123,3 @@ createButton.addEventListener("click", () => {
     toggleCreateForm();
   }
 });
-
-export { upsertSave, loadState };

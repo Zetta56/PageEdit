@@ -24,9 +24,7 @@
     }
   }
 
-  async function loadChanges(saveIndex) {
-    const {saves} = await browser.storage.local.get("saves")
-    const changes = saves[saveIndex].changes;
+  async function loadChanges(changes) {
     for(let change of changes) {
       let target = getElementByDOMIndices(change.path);
       switch(change.type) {
@@ -44,7 +42,7 @@
   browser.runtime.onMessage.addListener(message => {
     switch(message.type) {
       case "load":
-        loadChanges(message.saveIndex);
+        loadChanges(message.changes);
         break;
     }
   });

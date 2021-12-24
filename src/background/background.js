@@ -1,3 +1,4 @@
+// Initialize extension state
 browser.runtime.onInstalled.addListener(() => {
   browser.storage.local.set({
     editingTabs: [],
@@ -6,6 +7,7 @@ browser.runtime.onInstalled.addListener(() => {
 });
 
 browser.runtime.onMessage.addListener(async (message) => {
+  // Whenever a content script is unloaded, remove its tab from editingTabs
   if(message.type === "unload") {
     const {editingTabs} = await browser.storage.local.get("editingTabs");
     let tabs = await browser.tabs.query({active: true, currentWindow: true});
