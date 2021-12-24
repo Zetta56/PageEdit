@@ -1,3 +1,4 @@
+// This file will be injected before content.js when loading a save
 (function() {
   loadedHistory = [];
 
@@ -22,23 +23,29 @@
       element.style[property] = styles[property];
     }
   }
-  
-  browser.runtime.onMessage.addListener(async (message) => {
-    if(message.type === "load") {
-      const {saves} = await browser.storage.local.get("saves")
-      const changes = saves[message.saveIndex].changes;
-      for(let change of changes) {
-        let target = getElementByDOMIndices(change.path);
-        switch(change.type) {
-          case "select":
-            target.style.position = "relative";
-            applyStyles(target, change.styles);
-            break;
-          case "delete":
-            target.remove();
-        }
+
+  async function loadChanges(saveIndex) {
+    const {saves} = await browser.storage.local.get("saves")
+    const changes = saves[saveIndex].changes;
+    for(let change of changes) {
+      let target = getElementByDOMIndices(change.path);
+      switch(change.type) {
+        case "select":
+          target.style.position = "relative";
+          applyStyles(target, change.styles);
+          break;
+        case "delete":
+          target.remove();
       }
-      loadedHistory = changes
+    }
+    loadedHistory = changes;
+  }
+  
+  browser.runtime.onMessage.addListener(message => {
+    switch(message.type) {
+      case "load":
+        loadChanges(message.saveIndex);
+        break;
     }
   });
 })();
