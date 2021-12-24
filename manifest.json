@@ -1,7 +1,7 @@
 {
   "name": "Page Edit",
   "description": "An visual editor for HTML elements",
-  "version": "1.0",
+  "version": "1.0.1",
   "manifest_version": 2,
   "permissions": ["tabs", "<all_urls>", "storage"],
   "background": {

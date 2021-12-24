@@ -87,4 +87,4 @@ createButton.addEventListener("click", () => {
   }
 });
 
-export { upsertSave };
+export { upsertSave, loadState };
