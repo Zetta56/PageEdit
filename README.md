@@ -5,7 +5,7 @@
 # PageEdit
 A Firefox extension that lets you customize and save page layouts using the click of your mouse. Tailor your pages by resizing, moving, and deleting page elements.
 
-Note: This extension may be slow on complex websites with huge HTML hierarchies.
+Note: This extension may save and load slowly on complex websites with large, complex HTML hierarchies.
 
 **Release: https://addons.mozilla.org/en-US/firefox/addon/page_edit/**
 
